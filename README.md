@@ -28,7 +28,47 @@ A non-invasive Chrome Extension that lets you take timestamped notes on YouTube 
 npm install
 ```
 
-### 2. Set Up Environment Variables
+### 2. Configure Google OAuth for Chrome Extension
+
+**Important:** The extension uses Chrome's Identity API for Google sign-in. You need to configure OAuth properly:
+
+1. **Go to [Google Cloud Console](https://console.cloud.google.com/)**
+2. **Create a new project** or select an existing one
+3. **Enable Google+ API** (or People API):
+   - Go to "APIs & Services" → "Library"
+   - Search for "Google People API" and enable it
+   - This is needed to fetch user profile information
+4. **Create OAuth 2.0 Credentials**:
+   - Go to "APIs & Services" → "Credentials"
+   - Click "Create Credentials" → "OAuth client ID"
+   - **Choose "Chrome Extension"** (NOT Web application or Chrome App)
+   - You'll need your extension ID for this step (see step 5 below)
+5. **Get your Extension ID**:
+   - Build the extension first: `npm run build`
+   - Load it in Chrome: `chrome://extensions/` → Enable "Developer mode" → "Load unpacked" → select `dist` folder
+   - Copy the extension ID shown on the extension card (it looks like: `abcdefghijklmnopqrstuvwxyz123456`)
+6. **Complete the OAuth client setup**:
+   - Go back to Google Cloud Console
+   - If you already created the client, edit it
+   - For "Chrome Extension", paste your extension ID in the appropriate field
+7. **Update manifest.json**:
+   - Open `public/manifest.json`
+   - Add an `oauth2` section with your client ID:
+   ```json
+   "oauth2": {
+     "client_id": "YOUR_CLIENT_ID.apps.googleusercontent.com",
+     "scopes": [
+       "https://www.googleapis.com/auth/userinfo.email",
+       "https://www.googleapis.com/auth/userinfo.profile"
+     ]
+   }
+   ```
+   - Rebuild the extension: `npm run build`
+   - Reload it in Chrome
+
+**Note:** OAuth setup is completely optional. The extension works perfectly without it - all notes are saved locally!
+
+### 3. Set Up Environment Variables (Optional - for Supabase sync)
 
 Copy the example environment file and fill in your credentials:
 
@@ -36,15 +76,16 @@ Copy the example environment file and fill in your credentials:
 cp .env.example .env
 ```
 
-Edit `.env` with your Supabase and Google OAuth credentials:
+Edit `.env` with your Supabase credentials:
 
 ```
 SUPABASE_URL=your_supabase_url
 SUPABASE_ANON_KEY=your_supabase_anon_key
-GOOGLE_CLIENT_ID=your_google_client_id
 ```
 
-### 3. Set Up Supabase Database
+**Note:** The extension works perfectly without Supabase - notes are saved locally. Supabase is only needed for cross-device sync.
+
+### 4. Set Up Supabase Database (Optional)
 
 Create a table in your Supabase project:
 
@@ -84,17 +125,6 @@ CREATE POLICY "Users can delete own notes"
   ON notes FOR DELETE 
   USING (auth.uid() = user_id);
 ```
-
-### 4. Configure Google OAuth
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing
-3. Enable Google+ API
-4. Create OAuth 2.0 credentials (Web application)
-5. Add authorized redirect URIs:
-   - `https://<your-extension-id>.chromiumapp.org/`
-   - Get extension ID after first load in Chrome
-6. Update `public/manifest.json` with your client ID
 
 ### 5. Build the Extension
 
@@ -233,4 +263,3 @@ MIT License - feel free to use and modify as needed.
 ## 🙏 Credits
 
 Built with ❤️ for better YouTube learning and content consumption.
-

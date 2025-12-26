@@ -37,11 +37,15 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     // Stop all keyboard events from reaching YouTube
     e.stopPropagation();
 
-    // Submit on Cmd/Ctrl + Enter
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    // Submit on plain Enter (without modifier keys)
+    if (e.key === 'Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
       e.preventDefault();
       handleSubmit(e);
+      return;
     }
+
+    // Allow Cmd/Ctrl + Enter to insert new line (default textarea behavior)
+    // Don't prevent default for this case, let the textarea handle it
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -86,7 +90,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
         )}
       </div>
       <p className="ytn-text-xs ytn-text-gray-500 ytn-mt-1 ytn-mb-0">
-        Tip: Press Cmd/Ctrl + Enter to save
+        Tip: Press Enter to save or Cmd/Ctrl + Enter for new line
       </p>
     </form>
   );

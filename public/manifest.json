@@ -5,10 +5,12 @@
   "description": "Take timestamped notes on YouTube videos",
   "permissions": [
     "storage",
+    "tabs",
     "identity"
   ],
   "host_permissions": [
-    "https://www.youtube.com/*"
+    "https://www.youtube.com/*",
+    "https://*.supabase.co/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -34,8 +36,11 @@
     "128": "icons/icon128.png"
   },
   "oauth2": {
-    "client_id": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
-    "scopes": ["openid", "email", "profile"]
-  }
+    "client_id": "807502211484-gvh34v8kdfugr8gqoaealtj9085aiu9a.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile"
+    ]
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAhxjMKMqN8AqL0GZvC6vGlqJdEz6fxqQRnvVjN/xmPvNhAKkJ5vU3yHqLJPAR4gZK8xQKCGPIVqXRH7vy7iC0DfYGZH9gKKFpqE5iN0xKQKjGQjYvPqB7J5xLZ8vXKvYqE9Q0vJ3qN7A5L6bE7gqKvN5J4xQF8hGqL7vJ3K5E8Q9L6hJ4K7L8Q5K6J7gL8vN9K4J6L7hQ5K8J7L9vQ6K5J8L7K9Q4J7L8K6Q5J9L7K8Q6J8L9K7Q5J7L8K9Q6J8L7K5Q9J6L8K7Q5J9L7K8Q6J8L9K7Q5J7L8K9Q6J8L7K5Q9J6L8K7Q5J9L7K8Q6JQIDAQAB"
 }
-

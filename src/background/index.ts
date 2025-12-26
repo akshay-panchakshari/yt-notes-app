@@ -1,5 +1,5 @@
 import { NotesStorage } from '@/utils/storage';
-import { syncNotesToSupabase, getSession, signOut } from '@/utils/supabase';
+import { syncNotesToSupabase, getSession, signOut, fetchAllNotesFromSupabase, isSupabaseConfigured } from '@/utils/supabase';
 import { ChromeMessage } from '@/types';
 
 /**
@@ -11,13 +11,6 @@ import { ChromeMessage } from '@/types';
 const SYNC_INTERVAL = 5 * 60 * 1000;
 
 let syncInterval: NodeJS.Timeout | null = null;
-
-/**
- * Check if Supabase is configured
- */
-function isSupabaseConfigured(): boolean {
-  return !!(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
-}
 
 /**
  * Initialize background script
@@ -46,28 +39,85 @@ async function checkAuthStatus() {
   }
 
   try {
-    const session = await getSession();
-    if (session?.user) {
-      await NotesStorage.saveUser({
-        id: session.user.id,
-        email: session.user.email,
-        name: session.user.user_metadata?.name,
-        avatar: session.user.user_metadata?.avatar_url,
-      });
+    // Check if user is stored locally (Chrome Identity auth)
+    const user = await NotesStorage.getUser();
 
-      // Trigger initial sync
-      await syncNotes();
+    if (user?.id) {
+      console.log('YouTube Notes: User authenticated, triggering sync...', user.email);
+      // Trigger initial full sync (bidirectional)
+      await performFullSync(user.id);
     } else {
+      console.log('YouTube Notes: No user authenticated');
       await NotesStorage.clearUser();
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.log('YouTube Notes: Auth check skipped -', errorMessage);
+    console.log('YouTube Notes: Auth check error -', errorMessage);
   }
 }
 
 /**
- * Sync unsynced notes to Supabase
+ * Perform full bidirectional sync
+ * 1. Fetch all remote notes
+ * 2. Merge with local notes (newer wins)
+ * 3. Push any unsynced local notes to server
+ */
+async function performFullSync(userId: string) {
+  if (!isSupabaseConfigured()) {
+    return;
+  }
+
+  try {
+    console.log('YouTube Notes: Starting full sync...');
+
+    await NotesStorage.setSyncStatus({ status: 'syncing', message: 'Syncing notes...' });
+
+    // Step 1: Fetch all notes from Supabase
+    const remoteNotes = await fetchAllNotesFromSupabase(userId);
+    console.log(`Fetched ${Object.keys(remoteNotes).length} videos from remote`);
+
+    // Step 2: Merge remote notes with local notes
+    await NotesStorage.mergeNotes(remoteNotes);
+    console.log('Merged remote notes with local notes');
+
+    // Step 3: Push any unsynced local notes to server
+    const unsyncedNotes = await NotesStorage.getUnsyncedNotes();
+    if (unsyncedNotes.length > 0) {
+      console.log(`Pushing ${unsyncedNotes.length} unsynced notes to server`);
+
+      // Add userId to notes
+      const notesWithUser = unsyncedNotes.map(note => ({
+        ...note,
+        userId: userId,
+      }));
+
+      await syncNotesToSupabase(notesWithUser);
+      await NotesStorage.markAsSynced(unsyncedNotes.map(n => n.id));
+    }
+
+    // Update sync status
+    await NotesStorage.setLastSyncTime(Date.now());
+    await NotesStorage.setSyncStatus({
+      status: 'success',
+      message: 'Sync complete',
+      lastSync: Date.now()
+    });
+
+    console.log('YouTube Notes: Full sync complete');
+
+    // Notify all tabs about sync completion
+    broadcastMessage({ type: 'SYNC_COMPLETE' });
+  } catch (error) {
+    console.error('Full sync failed:', error);
+    await NotesStorage.setSyncStatus({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Sync failed'
+    });
+  }
+}
+
+/**
+ * Sync unsynced notes to Supabase (one-way push)
  */
 async function syncNotes() {
   if (!isSupabaseConfigured()) {
@@ -156,6 +206,15 @@ chrome.runtime.onMessage.addListener((message: ChromeMessage, sender, sendRespon
         case 'NOTES_UPDATED':
           // Trigger immediate sync when notes are updated
           await syncNotes();
+          sendResponse({ success: true });
+          break;
+
+        case 'SYNC_COMPLETE':
+          // Manual sync triggered from popup
+          const user = await NotesStorage.getUser();
+          if (user) {
+            await performFullSync(user.id);
+          }
           sendResponse({ success: true });
           break;
 

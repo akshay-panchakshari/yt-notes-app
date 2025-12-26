@@ -8,6 +8,13 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 let supabaseClient: SupabaseClient | null = null;
 
 /**
+ * Check if Supabase is configured
+ */
+export function isSupabaseConfigured(): boolean {
+  return !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+}
+
+/**
  * Initialize Supabase client (lazy initialization)
  */
 export function getSupabaseClient(): SupabaseClient {
@@ -79,6 +86,45 @@ export async function fetchNotesFromSupabase(
     userId: row.user_id,
     synced: true,
   }));
+}
+
+/**
+ * Fetch all notes from Supabase for a user
+ */
+export async function fetchAllNotesFromSupabase(userId: string): Promise<Record<string, Note[]>> {
+  const client = getSupabaseClient();
+
+  const { data, error } = await client
+    .from('notes')
+    .select('*')
+    .eq('user_id', userId)
+    .order('timestamp', { ascending: true });
+
+  if (error) {
+    throw new Error(`Fetch failed: ${error.message}`);
+  }
+
+  // Group notes by video ID
+  const notesByVideo: Record<string, Note[]> = {};
+  (data || []).forEach(row => {
+    const note: Note = {
+      id: row.id,
+      videoId: row.video_id,
+      timestamp: row.timestamp,
+      text: row.text,
+      createdAt: new Date(row.created_at).getTime(),
+      updatedAt: new Date(row.updated_at).getTime(),
+      userId: row.user_id,
+      synced: true,
+    };
+
+    if (!notesByVideo[note.videoId]) {
+      notesByVideo[note.videoId] = [];
+    }
+    notesByVideo[note.videoId].push(note);
+  });
+
+  return notesByVideo;
 }
 
 /**

@@ -4,6 +4,7 @@ const STORAGE_KEYS = {
   NOTES: 'yt_notes',
   USER: 'yt_user',
   SYNC_STATUS: 'yt_sync_status',
+  LAST_SYNC: 'yt_last_sync',
 } as const;
 
 /**
@@ -139,5 +140,90 @@ export class NotesStorage {
   static async clearUser(): Promise<void> {
     await chrome.storage.local.remove(STORAGE_KEYS.USER);
   }
-}
 
+  /**
+   * Merge local and remote notes intelligently
+   * Remote notes take precedence if they're newer
+   */
+  static async mergeNotes(remoteNotes: Record<string, Note[]>): Promise<void> {
+    const localNotes = await this.getAllNotes();
+    const merged: Record<string, Note[]> = {};
+
+    // Start with all local notes
+    Object.entries(localNotes).forEach(([videoId, notes]) => {
+      merged[videoId] = [...notes];
+    });
+
+    // Merge in remote notes
+    Object.entries(remoteNotes).forEach(([videoId, remoteVideoNotes]) => {
+      if (!merged[videoId]) {
+        // No local notes for this video, use all remote notes
+        merged[videoId] = remoteVideoNotes;
+      } else {
+        // Merge local and remote notes
+        const localVideoNotes = merged[videoId];
+        const localNotesMap = new Map(localVideoNotes.map(n => [n.id, n]));
+
+        remoteVideoNotes.forEach(remoteNote => {
+          const localNote = localNotesMap.get(remoteNote.id);
+
+          if (!localNote) {
+            // New note from remote, add it
+            localVideoNotes.push(remoteNote);
+          } else if (remoteNote.updatedAt > localNote.updatedAt) {
+            // Remote note is newer, replace local
+            const index = localVideoNotes.findIndex(n => n.id === remoteNote.id);
+            if (index !== -1) {
+              localVideoNotes[index] = remoteNote;
+            }
+          }
+          // If local is newer or same, keep local version
+        });
+
+        // Sort by timestamp
+        localVideoNotes.sort((a, b) => a.timestamp - b.timestamp);
+        merged[videoId] = localVideoNotes;
+      }
+    });
+
+    // Save merged notes
+    await chrome.storage.local.set({ [STORAGE_KEYS.NOTES]: merged });
+  }
+
+  /**
+   * Replace all notes with synced notes from server
+   */
+  static async replaceAllNotes(notes: Record<string, Note[]>): Promise<void> {
+    await chrome.storage.local.set({ [STORAGE_KEYS.NOTES]: notes });
+  }
+
+  /**
+   * Get last sync timestamp
+   */
+  static async getLastSyncTime(): Promise<number> {
+    const result = await chrome.storage.local.get(STORAGE_KEYS.LAST_SYNC);
+    return result[STORAGE_KEYS.LAST_SYNC] || 0;
+  }
+
+  /**
+   * Set last sync timestamp
+   */
+  static async setLastSyncTime(timestamp: number): Promise<void> {
+    await chrome.storage.local.set({ [STORAGE_KEYS.LAST_SYNC]: timestamp });
+  }
+
+  /**
+   * Get sync status
+   */
+  static async getSyncStatus(): Promise<any> {
+    const result = await chrome.storage.local.get(STORAGE_KEYS.SYNC_STATUS);
+    return result[STORAGE_KEYS.SYNC_STATUS] || null;
+  }
+
+  /**
+   * Set sync status
+   */
+  static async setSyncStatus(status: any): Promise<void> {
+    await chrome.storage.local.set({ [STORAGE_KEYS.SYNC_STATUS]: status });
+  }
+}

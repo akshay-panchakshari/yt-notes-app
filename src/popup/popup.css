@@ -142,3 +142,64 @@ body {
   background: #3f3f3f;
   color: #f1f1f1;
 }
+.sync-status {
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: center;
+  margin-bottom: 8px;
+}
+.sync-status-syncing {
+  background: #2a2a2a;
+  color: #3ea6ff;
+  border: 1px solid #3ea6ff;
+}
+.sync-status-success {
+  background: #1a3a1a;
+  color: #4ade80;
+  border: 1px solid #4ade80;
+}
+.sync-status-error {
+  background: #3a1a1a;
+  color: #f87171;
+  border: 1px solid #f87171;
+}
+.sync-time {
+  font-size: 11px;
+  opacity: 0.8;
+  margin-top: 4px;
+}
+.setup-info {
+  margin-top: 20px;
+  padding: 16px;
+  background: #1a1a1a;
+  border-radius: 8px;
+  border: 1px solid #3f3f3f;
+}
+.setup-info h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: #3ea6ff;
+}
+.setup-steps {
+  font-size: 12px;
+  color: #aaaaaa;
+  margin: 8px 0 4px 0;
+}
+.setup-list {
+  padding-left: 20px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #aaaaaa;
+  margin: 8px 0;
+}
+.setup-list li {
+  margin-bottom: 4px;
+}
+.setup-note {
+  font-size: 11px;
+  color: #717171;
+  margin-top: 8px;
+  margin-bottom: 0;
+}

@@ -64,6 +64,29 @@ const NotesPanel: React.FC = () => {
     loadUser();
   }, []);
 
+  // Listen for sync completion messages
+  useEffect(() => {
+    const handleMessage = (message: any) => {
+      if (message.type === 'SYNC_COMPLETE' && videoId) {
+        // Reload notes when sync completes
+        loadNotes(videoId);
+      }
+      if (message.type === 'AUTH_STATUS_CHANGED') {
+        // Reload user when auth status changes
+        loadUser();
+        if (videoId) {
+          loadNotes(videoId);
+        }
+      }
+    };
+
+    chrome.runtime.onMessage.addListener(handleMessage);
+
+    return () => {
+      chrome.runtime.onMessage.removeListener(handleMessage);
+    };
+  }, [videoId]);
+
   const loadUser = async () => {
     const currentUser = await NotesStorage.getUser();
     setUser(currentUser);
@@ -75,25 +98,53 @@ const NotesPanel: React.FC = () => {
   };
 
   const handleAddNote = async (text: string) => {
-    if (!videoId || !text.trim()) return;
+    try {
+      console.log('handleAddNote called with text:', text);
 
-    const timestamp = getCurrentTimestamp();
-    const newNote: Note = {
-      id: generateId(),
-      videoId,
-      timestamp,
-      text: text.trim(),
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      userId: user?.id,
-      synced: false,
-    };
+      if (!videoId) {
+        console.error('No videoId found');
+        return;
+      }
 
-    await NotesStorage.addNote(newNote);
-    await loadNotes(videoId);
+      if (!text.trim()) {
+        console.error('Empty text provided');
+        return;
+      }
 
-    // Notify background script to sync
-    chrome.runtime.sendMessage({ type: 'NOTES_UPDATED' });
+      const timestamp = getCurrentTimestamp();
+      console.log('Current timestamp:', timestamp);
+
+      const noteId = generateId();
+      console.log('Generated note ID:', noteId);
+
+      const newNote: Note = {
+        id: noteId,
+        videoId,
+        timestamp,
+        text: text.trim(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        userId: user?.id,
+        synced: false,
+      };
+
+      console.log('Creating note:', newNote);
+
+      await NotesStorage.addNote(newNote);
+      console.log('Note added to storage');
+
+      await loadNotes(videoId);
+      console.log('Notes reloaded');
+
+      // Notify background script to sync
+      chrome.runtime.sendMessage({ type: 'NOTES_UPDATED' }).catch(err => {
+        console.error('Failed to notify background script:', err);
+      });
+
+      console.log('Note successfully added!');
+    } catch (error) {
+      console.error('Error in handleAddNote:', error);
+    }
   };
 
   const handleUpdateNote = async (noteId: string, text: string) => {
@@ -182,4 +233,3 @@ const NotesPanel: React.FC = () => {
 };
 
 export default NotesPanel;
-

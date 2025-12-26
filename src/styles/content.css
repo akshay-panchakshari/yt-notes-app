@@ -1,0 +1,10 @@
+    }
+  }
+
+  // Observe navigation changes
+  observeNavigation();
+}
+
+// Start the extension
+initialize();
+

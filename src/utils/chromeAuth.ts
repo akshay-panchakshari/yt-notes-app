@@ -35,25 +35,26 @@ function stringToUUID(str: string): string {
  */
 export async function signInWithChromeIdentity(): Promise<any> {
   try {
-    console.log('Attempting to get Chrome auth token...');
+    console.log('🔐 [ChromeAuth] signInWithChromeIdentity() - Starting...');
+    console.log('🔐 [ChromeAuth] Attempting to get Chrome auth token...');
 
     // Get OAuth token using Chrome Identity API
     const token = await new Promise<string>((resolve, reject) => {
       chrome.identity.getAuthToken({ interactive: true }, (token) => {
         if (chrome.runtime.lastError) {
-          console.error('Chrome Identity API error:', chrome.runtime.lastError);
+          console.error('🔐 [ChromeAuth] Chrome Identity API error:', chrome.runtime.lastError);
           reject(chrome.runtime.lastError);
         } else if (token) {
-          console.log('Token received successfully');
+          console.log('🔐 [ChromeAuth] Token received successfully');
           resolve(token);
         } else {
-          console.error('No token received from Chrome Identity API');
+          console.error('🔐 [ChromeAuth] No token received from Chrome Identity API');
           reject(new Error('No token received'));
         }
       });
     });
 
-    console.log('Fetching user info from Google...');
+    console.log('🔐 [ChromeAuth] Fetching user info from Google...');
 
     // Get user info from Google
     const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
@@ -63,18 +64,18 @@ export async function signInWithChromeIdentity(): Promise<any> {
     });
 
     if (!response.ok) {
-      console.error('Failed to fetch user info. Status:', response.status);
+      console.error('🔐 [ChromeAuth] Failed to fetch user info. Status:', response.status);
       throw new Error('Failed to fetch user info');
     }
 
     const userInfo = await response.json();
-    console.log('User info retrieved:', userInfo.email);
+    console.log('🔐 [ChromeAuth] User info retrieved:', userInfo.email);
 
     // Convert Google ID to UUID format for Supabase compatibility
     const supabaseUserId = stringToUUID(userInfo.id);
-    console.log('Google ID converted to UUID:', supabaseUserId);
+    console.log('🔐 [ChromeAuth] Google ID converted to UUID:', supabaseUserId);
 
-    return {
+    const authResult = {
       token,
       user: {
         id: supabaseUserId,
@@ -84,8 +85,11 @@ export async function signInWithChromeIdentity(): Promise<any> {
         avatar: userInfo.picture,
       },
     };
+
+    console.log('🔐 [ChromeAuth] signInWithChromeIdentity() - Returning auth result:', authResult);
+    return authResult;
   } catch (error) {
-    console.error('Chrome Identity sign in failed:', error);
+    console.error('🔐 [ChromeAuth] Chrome Identity sign in failed:', error);
 
     // Provide more specific error messages
     if (error && typeof error === 'object' && 'message' in error) {

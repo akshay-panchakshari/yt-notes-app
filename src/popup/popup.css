@@ -93,6 +93,28 @@ body {
   color: #717171;
   line-height: 1.4;
 }
+.sync-promo {
+  width: 100%;
+  padding: 16px;
+  background: linear-gradient(135deg, #1a3a4a 0%, #2a2a3a 100%);
+  border-radius: 8px;
+  border: 1px solid #3ea6ff;
+  margin: 8px 0;
+}
+.sync-promo h4 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #3ea6ff;
+  margin: 0 0 8px 0;
+  text-align: center;
+}
+.sync-promo p {
+  font-size: 13px;
+  color: #aaaaaa;
+  line-height: 1.5;
+  margin: 0;
+  text-align: center;
+}
 .info-section {
   padding-top: 20px;
   border-top: 1px solid #3f3f3f;
@@ -175,31 +197,82 @@ body {
   background: #1a1a1a;
   border-radius: 8px;
   border: 1px solid #3f3f3f;
+  text-align: left;
 }
 .setup-info h4 {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   margin: 0 0 8px 0;
   color: #3ea6ff;
+  text-align: center;
 }
-.setup-steps {
-  font-size: 12px;
+.setup-description {
+  font-size: 13px;
   color: #aaaaaa;
-  margin: 8px 0 4px 0;
+  line-height: 1.5;
+  margin: 8px 0 16px 0;
+  text-align: center;
+}
+.setup-steps-container {
+  background: #272727;
+  padding: 14px;
+  border-radius: 6px;
+  margin: 12px 0;
+}
+.setup-steps-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f1f1f1;
+  margin: 0 0 12px 0;
 }
 .setup-list {
   padding-left: 20px;
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.7;
   color: #aaaaaa;
-  margin: 8px 0;
+  margin: 0;
 }
 .setup-list li {
-  margin-bottom: 4px;
+  margin-bottom: 14px;
+  color: #f1f1f1;
+}
+.setup-list li:last-child {
+  margin-bottom: 0;
+}
+.setup-list strong {
+  color: #3ea6ff;
+  font-weight: 600;
+  font-size: 13px;
+}
+.step-detail {
+  font-size: 11px;
+  color: #aaaaaa;
+  line-height: 1.5;
+  display: block;
+  margin-top: 4px;
+}
+.step-detail a {
+  color: #3ea6ff;
+  text-decoration: none;
+}
+.step-detail a:hover {
+  text-decoration: underline;
+}
+.step-detail code {
+  background: #0f0f0f;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #4ade80;
 }
 .setup-note {
-  font-size: 11px;
+  font-size: 12px;
   color: #717171;
-  margin-top: 8px;
-  margin-bottom: 0;
+  margin: 12px 0 0 0;
+  text-align: center;
+  line-height: 1.5;
+}
+.setup-note strong {
+  color: #aaaaaa;
 }

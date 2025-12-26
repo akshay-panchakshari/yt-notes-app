@@ -123,22 +123,33 @@ export class NotesStorage {
    * Get current user
    */
   static async getUser(): Promise<any> {
+    console.log('📦 [Storage] getUser() called');
     const result = await chrome.storage.local.get(STORAGE_KEYS.USER);
-    return result[STORAGE_KEYS.USER] || null;
+    const user = result[STORAGE_KEYS.USER] || null;
+    console.log('📦 [Storage] getUser() result:', user);
+    return user;
   }
 
   /**
    * Save current user
    */
   static async saveUser(user: any): Promise<void> {
+    console.log('📦 [Storage] saveUser() called with:', user);
     await chrome.storage.local.set({ [STORAGE_KEYS.USER]: user });
+    console.log('📦 [Storage] saveUser() completed - user saved to storage');
+
+    // Verify it was saved
+    const verification = await chrome.storage.local.get(STORAGE_KEYS.USER);
+    console.log('📦 [Storage] saveUser() verification - data in storage:', verification[STORAGE_KEYS.USER]);
   }
 
   /**
    * Clear user (logout)
    */
   static async clearUser(): Promise<void> {
+    console.log('📦 [Storage] clearUser() called');
     await chrome.storage.local.remove(STORAGE_KEYS.USER);
+    console.log('📦 [Storage] clearUser() completed');
   }
 
   /**

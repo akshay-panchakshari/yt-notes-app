@@ -1,5 +1,5 @@
 import { NotesStorage } from '@/utils/storage';
-import { syncNotesToSupabase, getSession, signOut, fetchAllNotesFromSupabase, isSupabaseConfigured } from '@/utils/supabase';
+import { syncNotesToSupabase, fetchAllNotesFromSupabase, isSupabaseConfigured } from '@/utils/supabase';
 import { ChromeMessage } from '@/types';
 
 /**
@@ -48,7 +48,9 @@ async function checkAuthStatus() {
       await performFullSync(user.id);
     } else {
       console.log('YouTube Notes: No user authenticated');
-      await NotesStorage.clearUser();
+      // DON'T clear the user here - only clear on explicit sign out
+      // This was causing race conditions where the background script would
+      // delete user data during initialization
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

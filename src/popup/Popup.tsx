@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { NotesStorage } from '@/utils/storage';
-import { signInWithChromeIdentity, signOutChromeIdentity } from '@/utils/chromeAuth';
+import { signOutChromeIdentity } from '@/utils/chromeAuth';
 import { isSupabaseConfigured } from '@/utils/supabase';
+import { performGoogleAuth } from '@/utils/authHandler';
 
 /**
  * Extension popup UI
@@ -14,95 +15,73 @@ const Popup: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<any>(null);
   const [lastSync, setLastSync] = useState<number>(0);
+  const [signingIn, setSigningIn] = useState(false);
 
   useEffect(() => {
-    console.log('🔵 [Popup] useEffect running - Component mounted/updated');
-    console.log('🔵 [Popup] Current user state:', user);
-
     const initialize = async () => {
-      console.log('🔵 [Popup] initialize() started');
-      // Add a small delay to ensure storage has been written after OAuth
-      console.log('🔵 [Popup] Waiting 100ms before loading user...');
-      await new Promise(resolve => setTimeout(resolve, 100));
-      console.log('🔵 [Popup] Calling loadUserWithRetry()...');
+      const result = await chrome.storage.local.get('oauth_in_progress');
+      const oauthInProgress = result.oauth_in_progress;
+
+      if (oauthInProgress) {
+        setSigningIn(true);
+      }
+
       await loadUserWithRetry();
-      console.log('🔵 [Popup] Calling loadSyncStatus()...');
       await loadSyncStatus();
-      console.log('🔵 [Popup] Setting loading to false');
+
+      if (oauthInProgress) {
+        await chrome.storage.local.remove('oauth_in_progress');
+      }
+
       setLoading(false);
-      console.log('🔵 [Popup] initialize() completed');
+      setSigningIn(false);
     };
     initialize();
 
-    // Listen for storage changes (when user signs in/out while popup is closed)
-    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
-      console.log('🟡 [Popup] Storage change detected:', { areaName, keys: Object.keys(changes) });
-      if (areaName === 'local' && changes.yt_user) {
-        console.log('🟡 [Popup] yt_user changed:', {
-          oldValue: changes.yt_user.oldValue,
-          newValue: changes.yt_user.newValue
-        });
-        console.log('🟡 [Popup] Reloading user from storage...');
-        loadUserWithRetry();
+    // Listen for auth completion from background or other contexts
+    const handleMessage = (message: any) => {
+      if (message.type === 'AUTH_COMPLETE' && message.user) {
+        setUser(message.user);
+        setSigningIn(false);
         loadSyncStatus();
+      }
+    };
+
+    chrome.runtime.onMessage.addListener(handleMessage);
+
+    // Listen for storage changes
+    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+      if (areaName === 'local' && changes.yt_user) {
+        loadUserWithRetry(1, 0);
+        loadSyncStatus();
+        setSigningIn(false);
       }
     };
 
     chrome.storage.onChanged.addListener(handleStorageChange);
-    console.log('🔵 [Popup] Storage change listener attached');
-
-    // Also check when popup becomes visible (handles case when OAuth completes)
-    const handleVisibilityChange = () => {
-      console.log('🟢 [Popup] Visibility/focus changed:', {
-        hidden: document.hidden,
-        hasFocus: document.hasFocus()
-      });
-      if (!document.hidden) {
-        console.log('🟢 [Popup] Popup is visible, checking for user updates...');
-        loadUserWithRetry();
-        loadSyncStatus();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleVisibilityChange);
-    console.log('🔵 [Popup] Visibility/focus listeners attached');
 
     return () => {
-      console.log('🔴 [Popup] Cleaning up listeners');
+      chrome.runtime.onMessage.removeListener(handleMessage);
       chrome.storage.onChanged.removeListener(handleStorageChange);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleVisibilityChange);
     };
   }, []);
 
-  const loadUserWithRetry = async (retries = 3, delay = 200) => {
+  const loadUserWithRetry = async (retries = 2, delay = 100) => {
     for (let i = 0; i < retries; i++) {
       try {
         const currentUser = await NotesStorage.getUser();
-        console.log(`loadUser attempt ${i + 1} - User loaded:`, currentUser);
-        console.log(`loadUser attempt ${i + 1} - Current state:`, user);
 
-        // If we got a user, update state and return
         if (currentUser) {
-          console.log(`🎯 [Popup] Setting user state to:`, currentUser);
           setUser(currentUser);
-          console.log(`🎯 [Popup] User state set complete`);
           return;
         }
 
-        // If no user yet and we have retries left, wait and try again
         if (i < retries - 1) {
-          console.log(`No user found, retrying in ${delay}ms...`);
           await new Promise(resolve => setTimeout(resolve, delay));
-          delay *= 2; // Exponential backoff
         } else {
-          // Final attempt returned null, user is not logged in
-          console.log(`🎯 [Popup] Setting user state to null (not logged in)`);
           setUser(null);
         }
       } catch (err) {
-        console.error(`loadUser attempt ${i + 1} - Error:`, err);
         if (i === retries - 1) {
           setError('Failed to load user data');
         }
@@ -117,35 +96,23 @@ const Popup: React.FC = () => {
       setSyncStatus(status);
       setLastSync(lastSyncTime);
     } catch (err) {
-      console.error('Failed to load sync status', err);
+      // Silent fail - non-critical
     }
   };
 
   const handleSignIn = async () => {
-    // Don't set loading state - the popup will close when OAuth starts
     setError(null);
+    chrome.storage.local.set({ oauth_in_progress: true });
+    setSigningIn(true);
+
     try {
-      console.log('Starting Google sign in...');
-
-      // Use Chrome Identity API for authentication
-      // Note: This will open a new window and the popup will close automatically
-      const authResult = await signInWithChromeIdentity();
-      console.log('Sign in successful:', authResult.user.email);
-
-      // Save user to storage (this triggers the storage listener in any open popup)
-      await NotesStorage.saveUser(authResult.user);
-      console.log('User saved to storage');
-
-      // Update local state immediately (if popup is still open)
+      const authResult = await performGoogleAuth();
+      chrome.storage.local.remove('oauth_in_progress');
+      setSigningIn(false);
       setUser(authResult.user);
-      console.log('User state updated:', authResult.user);
 
-      // Notify background script
-      chrome.runtime.sendMessage({ type: 'AUTH_STATUS_CHANGED' }).catch(() => {
-        console.log('Background script notification failed (popup might be closed)');
-      });
+      chrome.runtime.sendMessage({ type: 'AUTH_STATUS_CHANGED' }).catch(() => {});
 
-      // Notify all content scripts about auth change
       const tabs = await chrome.tabs.query({});
       tabs.forEach(tab => {
         if (tab.id) {
@@ -153,18 +120,13 @@ const Popup: React.FC = () => {
         }
       });
 
-      // Reload sync status after a delay to allow background sync to start
-      setTimeout(async () => {
-        try {
-          await loadSyncStatus();
-          console.log('Sync status refreshed after background sync');
-        } catch (e) {
-          console.log('Could not refresh sync status (popup might be closed)');
-        }
-      }, 1500);
+      setTimeout(() => {
+        loadSyncStatus().catch(() => {});
+      }, 1000);
 
     } catch (err) {
-      console.error('Sign in error:', err);
+      chrome.storage.local.remove('oauth_in_progress');
+      setSigningIn(false);
       const errorMessage = err instanceof Error ? err.message : 'Sign in failed. Please try again.';
       setError(errorMessage);
     }
@@ -177,28 +139,20 @@ const Popup: React.FC = () => {
       await signOutChromeIdentity();
       await NotesStorage.clearUser();
 
-      // Clear local state immediately
       setUser(null);
       setSyncStatus(null);
       setLastSync(0);
 
-      // Notify background script and all tabs
       await chrome.runtime.sendMessage({ type: 'AUTH_STATUS_CHANGED' });
 
-      // Notify all content scripts about auth change
       const tabs = await chrome.tabs.query({});
       tabs.forEach(tab => {
         if (tab.id) {
-          chrome.tabs.sendMessage(tab.id, { type: 'AUTH_STATUS_CHANGED' }).catch(() => {
-            // Ignore errors for tabs without content script
-          });
+          chrome.tabs.sendMessage(tab.id, { type: 'AUTH_STATUS_CHANGED' }).catch(() => {});
         }
       });
-
-      console.log('Sign out complete');
     } catch (err) {
       setError('Sign out failed. Please try again.');
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -209,11 +163,10 @@ const Popup: React.FC = () => {
     setError(null);
     try {
       await chrome.runtime.sendMessage({ type: 'SYNC_COMPLETE' });
-      // Wait a bit for sync to complete
       setTimeout(async () => {
         await loadSyncStatus();
         setSyncing(false);
-      }, 2000);
+      }, 1500);
     } catch (err) {
       setError('Sync failed. Please try again.');
       setSyncing(false);
@@ -248,9 +201,6 @@ const Popup: React.FC = () => {
   }
 
   const isConfigured = isSupabaseConfigured();
-
-  console.log('🎨 [Popup] RENDER - user state:', user);
-  console.log('🎨 [Popup] RENDER - showing UI:', user ? 'SIGNED IN' : 'SIGNED OUT');
 
   return (
     <div className="popup-container">

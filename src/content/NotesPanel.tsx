@@ -99,23 +99,12 @@ const NotesPanel: React.FC = () => {
 
   const handleAddNote = async (text: string) => {
     try {
-      console.log('handleAddNote called with text:', text);
-
-      if (!videoId) {
-        console.error('No videoId found');
-        return;
-      }
-
-      if (!text.trim()) {
-        console.error('Empty text provided');
+      if (!videoId || !text.trim()) {
         return;
       }
 
       const timestamp = getCurrentTimestamp();
-      console.log('Current timestamp:', timestamp);
-
       const noteId = generateId();
-      console.log('Generated note ID:', noteId);
 
       const newNote: Note = {
         id: noteId,
@@ -128,22 +117,12 @@ const NotesPanel: React.FC = () => {
         synced: false,
       };
 
-      console.log('Creating note:', newNote);
-
       await NotesStorage.addNote(newNote);
-      console.log('Note added to storage');
-
       await loadNotes(videoId);
-      console.log('Notes reloaded');
 
-      // Notify background script to sync
-      chrome.runtime.sendMessage({ type: 'NOTES_UPDATED' }).catch(err => {
-        console.error('Failed to notify background script:', err);
-      });
-
-      console.log('Note successfully added!');
+      chrome.runtime.sendMessage({ type: 'NOTES_UPDATED' }).catch(() => {});
     } catch (error) {
-      console.error('Error in handleAddNote:', error);
+      console.error('Error adding note:', error);
     }
   };
 

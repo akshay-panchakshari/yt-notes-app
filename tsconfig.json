@@ -14,9 +14,11 @@
     "baseUrl": "./src",
     "paths": {
       "@/*": ["*"]
-    }
+    },
+    "removeComments": true,
+    "importHelpers": false,
+    "downlevelIteration": false
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
-

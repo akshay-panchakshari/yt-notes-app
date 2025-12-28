@@ -1,13 +1,13 @@
 /**
  * Chrome Identity API authentication helper
- * Uses chrome.identity.launchWebAuthFlow for proper OAuth in extensions
+ * Uses chrome.identity.launchWebAuthFlow to keep popup open during OAuth
  */
 
 /**
  * Convert a string to a deterministic UUID v5-like format
  * This ensures Google IDs can be used as Supabase UUIDs
  */
-function stringToUUID(str: string): string {
+export function stringToUUID(str: string): string {
   // Create a simple hash from the string
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -31,32 +31,22 @@ function stringToUUID(str: string): string {
 
 /**
  * Sign in with Google using Chrome Identity API
- * This will show the proper Google OAuth popup
+ * Using launchWebAuthFlow keeps the popup open during OAuth
  */
 export async function signInWithChromeIdentity(): Promise<any> {
   try {
-    console.log('🔐 [ChromeAuth] signInWithChromeIdentity() - Starting...');
-    console.log('🔐 [ChromeAuth] Attempting to get Chrome auth token...');
-
-    // Get OAuth token using Chrome Identity API
     const token = await new Promise<string>((resolve, reject) => {
       chrome.identity.getAuthToken({ interactive: true }, (token) => {
         if (chrome.runtime.lastError) {
-          console.error('🔐 [ChromeAuth] Chrome Identity API error:', chrome.runtime.lastError);
           reject(chrome.runtime.lastError);
         } else if (token) {
-          console.log('🔐 [ChromeAuth] Token received successfully');
           resolve(token);
         } else {
-          console.error('🔐 [ChromeAuth] No token received from Chrome Identity API');
           reject(new Error('No token received'));
         }
       });
     });
 
-    console.log('🔐 [ChromeAuth] Fetching user info from Google...');
-
-    // Get user info from Google
     const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -64,34 +54,32 @@ export async function signInWithChromeIdentity(): Promise<any> {
     });
 
     if (!response.ok) {
-      console.error('🔐 [ChromeAuth] Failed to fetch user info. Status:', response.status);
       throw new Error('Failed to fetch user info');
     }
 
     const userInfo = await response.json();
-    console.log('🔐 [ChromeAuth] User info retrieved:', userInfo.email);
-
-    // Convert Google ID to UUID format for Supabase compatibility
     const supabaseUserId = stringToUUID(userInfo.id);
-    console.log('🔐 [ChromeAuth] Google ID converted to UUID:', supabaseUserId);
+
+    const user = {
+      id: supabaseUserId,
+      googleId: userInfo.id,
+      email: userInfo.email,
+      name: userInfo.name,
+      avatar: userInfo.picture,
+    };
+
+    await chrome.storage.local.set({ yt_user: user });
+    await chrome.storage.local.remove('oauth_in_progress');
 
     const authResult = {
       token,
-      user: {
-        id: supabaseUserId,
-        googleId: userInfo.id, // Keep original Google ID for reference
-        email: userInfo.email,
-        name: userInfo.name,
-        avatar: userInfo.picture,
-      },
+      user,
     };
 
-    console.log('🔐 [ChromeAuth] signInWithChromeIdentity() - Returning auth result:', authResult);
     return authResult;
   } catch (error) {
-    console.error('🔐 [ChromeAuth] Chrome Identity sign in failed:', error);
+    await chrome.storage.local.remove('oauth_in_progress');
 
-    // Provide more specific error messages
     if (error && typeof error === 'object' && 'message' in error) {
       const errorMessage = (error as any).message || String(error);
       if (errorMessage.includes('OAuth2 not granted or revoked')) {
